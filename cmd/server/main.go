@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"habit-tracker/internal/config"
 	"habit-tracker/internal/database"
+	"habit-tracker/internal/handlers"
 	"log"
 	"net/http"
 )
@@ -26,4 +27,6 @@ func setupRoutes() {
 	fs := http.FileServer(http.Dir("./web"))
 	http.Handle("/", fs)
 
+	http.HandleFunc("/api/register", handlers.RegisterHandler)
+	http.HandleFunc("/api/login", handlers.LoginHandler)
 }

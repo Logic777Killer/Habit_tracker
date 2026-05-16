@@ -2,28 +2,28 @@ package main
 
 import (
 	"fmt"
+	"habit-tracker/internal/config"
+	"habit-tracker/internal/database"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: .env file not found, using system environment variables")
+	cfg := config.LoadConfig()
+
+	if err := database.InitDB(cfg); err != nil {
+		log.Fatalf("Could not connect to database: %v", err)
 	}
+	defer database.DB.Close()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	setupRoutes()
 
-	fmt.Printf("Server starting on port %s...\n", port)
+	fmt.Printf("Server starting on port %s...\n", cfg.Port)
+	log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
+}
 
+func setupRoutes() {
 	fs := http.FileServer(http.Dir("./web"))
 	http.Handle("/", fs)
 
-	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

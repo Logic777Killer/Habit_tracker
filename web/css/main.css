@@ -1,0 +1,60 @@
+:root {
+    --bg-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --primary-color: #4caf50;
+    --secondary-color: #2c2c2c;
+    --accent-color: #2196f3;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 800px;
+    padding: 20px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--secondary-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+#habitsList {
+    margin-top: 20px;
+}
+
+.habit-item {
+    background-color: var(--secondary-color);
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}

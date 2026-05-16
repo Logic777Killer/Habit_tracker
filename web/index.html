@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трекер привычек</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Трекер привычек</h1>
+        <nav>
+            <button id="loginBtn">Войти</button>
+            <button id="registerBtn">Регистрация</button>
+        </nav>
+    </header>
+
+    <main>
+        <section id="authSection" style="display: none;">
+            <h2>Авторизация</h2>
+        </section>
+
+        <section id="habitsSection">
+            <h2>Мои привычки</h2>
+            <div id="habitsList">
+                <p>Загрузка...</p>
+            </div>
+            <button id="addHabitBtn">Добавить привычку</button>
+        </section>
+    </main>
+</div>
+<script src="js/main.js"></script>
+</body>
+</html>

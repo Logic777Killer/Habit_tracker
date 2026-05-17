@@ -5,6 +5,7 @@ import (
 	"habit-tracker/internal/config"
 	"habit-tracker/internal/database"
 	"habit-tracker/internal/handlers"
+	"habit-tracker/internal/middleware"
 	"log"
 	"net/http"
 )
@@ -29,4 +30,10 @@ func setupRoutes() {
 
 	http.HandleFunc("/api/register", handlers.RegisterHandler)
 	http.HandleFunc("/api/login", handlers.LoginHandler)
+
+	http.HandleFunc("/api/habits", middleware.AuthMiddleware(handlers.GetHabitsHandler))
+	http.HandleFunc("/api/habits/create", middleware.AuthMiddleware(handlers.CreateHabitHandler))
+
+	http.HandleFunc("/api/habits/toggle", middleware.AuthMiddleware(handlers.ToggleHabitHandler))
+
 }

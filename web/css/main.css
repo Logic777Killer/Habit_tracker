@@ -74,3 +74,40 @@ header h1 { font-size: 1.6rem; font-weight: 600; }
 
 .habits-grid { display: flex; flex-direction: column; gap: 12px; }
 .placeholder { text-align: center; color: var(--text-muted); padding: 40px 0; }
+
+.habit-item {
+    background: var(--input-bg);
+    padding: 16px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: 0.2s;
+}
+.habit-item:hover {
+    transform: translateX(4px);
+}
+
+.btn-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+.btn-toggle.done {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+.btn-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}

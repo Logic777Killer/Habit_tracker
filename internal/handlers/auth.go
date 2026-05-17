@@ -105,5 +105,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Отправляем токен
-	json.NewEncoder(w).Encode(map[string]string{"token": token, "role": user.Role})
+	json.NewEncoder(w).Encode(map[string]string{
+		"token":    token,
+		"role":     user.Role,
+		"username": user.Username,
+	})
 }

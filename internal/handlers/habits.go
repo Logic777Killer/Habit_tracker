@@ -1,14 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"habit-tracker/internal/database"
 	"habit-tracker/internal/middleware"
 	"habit-tracker/internal/models"
-	"io"
-	"log"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // CreateHabitHandler создает новую привычку
@@ -104,30 +103,26 @@ func ToggleHabitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Читаем тело запроса для отладки
-	bodyBytes, _ := io.ReadAll(r.Body)
-	log.Printf("Toggle request body: %s", string(bodyBytes)) // <-- Лог для отладки
-
-	// Восстанавливаем тело, чтобы его можно было прочитать ещё раз
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 	var req struct {
-		HabitID int `json:"habit_id"`
+		HabitID int    `json:"habit_id"`
+		Date    string `json:"date"` // Опционально: YYYY-MM-DD
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("JSON decode error: %v", err) // <-- Лог ошибки парсинга
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if req.HabitID == 0 {
-		log.Printf("HabitID is zero or missing")
-		http.Error(w, "habit_id is required", http.StatusBadRequest)
-		return
+	// Определяем целевую дату
+	targetDate := time.Now().Format("2006-01-02")
+	if req.Date != "" {
+		if _, err := time.Parse("2006-01-02", req.Date); err != nil {
+			http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		targetDate = req.Date
 	}
 
-	// Проверяем, что привычка принадлежит текущему пользователю
+	// Проверка принадлежности привычки
 	var ownerID int
 	err := database.DB.QueryRow("SELECT user_id FROM habits WHERE id = $1", req.HabitID).Scan(&ownerID)
 	if err != nil || ownerID != userID {
@@ -135,18 +130,28 @@ func ToggleHabitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ... остальная логика переключения (без изменений) ...
+	// Проверяем, есть ли запись на эту дату
 	var exists bool
-	err = database.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM habit_logs WHERE habit_id = $1 AND completed_date = CURRENT_DATE)`, req.HabitID).Scan(&exists)
+	err = database.DB.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM habit_logs WHERE habit_id = $1 AND completed_date = $2::date)`,
+		req.HabitID, targetDate,
+	).Scan(&exists)
 	if err != nil {
-		http.Error(w, "DB error", http.StatusInternalServerError)
+		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
+	// Переключаем статус
 	if exists {
-		_, err = database.DB.Exec("DELETE FROM habit_logs WHERE habit_id = $1 AND completed_date = CURRENT_DATE", req.HabitID)
+		_, err = database.DB.Exec(
+			`DELETE FROM habit_logs WHERE habit_id = $1 AND completed_date = $2::date`,
+			req.HabitID, targetDate,
+		)
 	} else {
-		_, err = database.DB.Exec("INSERT INTO habit_logs (habit_id, completed_date) VALUES ($1, CURRENT_DATE)", req.HabitID)
+		_, err = database.DB.Exec(
+			`INSERT INTO habit_logs (habit_id, completed_date) VALUES ($1, $2::date)`,
+			req.HabitID, targetDate,
+		)
 	}
 
 	if err != nil {
@@ -154,5 +159,41 @@ func ToggleHabitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]bool{"completed": !exists})
+	json.NewEncoder(w).Encode(map[string]interface{}{"completed": !exists, "date": targetDate})
+}
+
+func GetHabitLogsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	habitID, _ := strconv.Atoi(r.URL.Query().Get("habit_id"))
+	month, _ := strconv.Atoi(r.URL.Query().Get("month"))
+	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
+
+	if habitID == 0 || month == 0 || year == 0 {
+		http.Error(w, "Missing habit_id, month or year", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT completed_date FROM habit_logs 
+		WHERE habit_id = $1 AND EXTRACT(YEAR FROM completed_date) = $2 AND EXTRACT(MONTH FROM completed_date) = $3
+	`, habitID, year, month)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var dates []string
+	for rows.Next() {
+		var date time.Time
+		if err := rows.Scan(&date); err == nil {
+			dates = append(dates, date.Format("2006-01-02"))
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string][]string{"dates": dates})
 }

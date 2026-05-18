@@ -17,7 +17,6 @@
     </header>
 
     <main>
-        <!-- Блок авторизации -->
         <section id="authSection" class="auth-card">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="login">Вход</button>
@@ -57,7 +56,6 @@
             </form>
         </section>
 
-        <!-- Основной интерфейс приложения -->
         <section id="appSection" class="app-card hidden">
             <div class="app-header">
                 <h2>Мои привычки</h2>
@@ -69,6 +67,29 @@
         </section>
     </main>
 </div>
+
 <script src="js/main.js"></script>
+<script src="js/calendar.js"></script>
+
+<!-- Модальное окно календаря -->
+<div id="calendarModal" class="modal hidden">
+    <div class="modal-content calendar-modal">
+        <div class="modal-header">
+            <h3 id="calendarTitle">Календарь</h3>
+            <button class="modal-close" id="closeCalendar">&times;</button>
+        </div>
+        <div class="calendar-nav">
+            <button id="prevMonth">◀</button>
+            <span id="monthYear"></span>
+            <button id="nextMonth">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+        <div class="calendar-legend">
+            <span class="dot completed"></span> Выполнено
+            <span class="dot empty"></span> Пропущено
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

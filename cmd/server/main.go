@@ -36,4 +36,6 @@ func setupRoutes() {
 
 	http.HandleFunc("/api/habits/toggle", middleware.AuthMiddleware(handlers.ToggleHabitHandler))
 
+	http.HandleFunc("/api/habits/logs", middleware.AuthMiddleware(handlers.GetHabitLogsHandler))
+
 }

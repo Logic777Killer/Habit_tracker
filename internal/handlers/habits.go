@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/lib/pq"
 	"habit-tracker/internal/database"
 	"habit-tracker/internal/middleware"
 	"habit-tracker/internal/models"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -196,4 +198,112 @@ func GetHabitLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string][]string{"dates": dates})
+}
+
+func GetHabitStatsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT h.id, h.title, COUNT(hl.completed_date) as total_days,
+		       ARRAY(SELECT completed_date::text FROM habit_logs WHERE habit_id = h.id ORDER BY completed_date DESC) as dates
+		FROM habits h
+		LEFT JOIN habit_logs hl ON h.id = hl.habit_id
+		WHERE h.user_id = $1
+		GROUP BY h.id, h.title
+	`, userID)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var stats []map[string]interface{}
+	for rows.Next() {
+		var id, totalDays int
+		var title string
+		var dateStrs []string
+
+		if err := rows.Scan(&id, &title, &totalDays, pq.Array(&dateStrs)); err != nil {
+			log.Printf("Stats scan error: %v", err)
+			continue
+		}
+
+		var dates []time.Time
+		for _, ds := range dateStrs {
+			if t, err := time.Parse("2006-01-02", ds); err == nil {
+				dates = append(dates, t)
+			}
+		}
+
+		stats = append(stats, map[string]interface{}{
+			"id":             id,
+			"title":          title,
+			"total_days":     totalDays,
+			"current_streak": calculateCurrentStreak(dates),
+			"longest_streak": calculateLongestStreak(dates),
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Rows iteration error", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(stats)
+}
+
+// calculateCurrentStreak считает дни подряд от сегодня
+func calculateCurrentStreak(dates []time.Time) int {
+	if len(dates) == 0 {
+		return 0
+	}
+
+	today := time.Now().Truncate(24 * time.Hour)
+	streak := 0
+	checkDate := today
+
+	for _, d := range dates {
+		date := d.Truncate(24 * time.Hour)
+		if date.Equal(checkDate) {
+			streak++
+			checkDate = checkDate.AddDate(0, 0, -1)
+		} else if date.Before(checkDate) {
+			break
+		}
+	}
+	return streak
+}
+
+// calculateLongestStreak считает самый длинный стрик в истории
+func calculateLongestStreak(dates []time.Time) int {
+	if len(dates) == 0 {
+		return 0
+	}
+
+	maxStreak := 1
+	currentStreak := 1
+
+	for i := 1; i < len(dates); i++ {
+		prev := dates[i-1].Truncate(24 * time.Hour)
+		curr := dates[i].Truncate(24 * time.Hour)
+
+		if prev.Sub(curr) == 24*time.Hour {
+			currentStreak++
+			if currentStreak > maxStreak {
+				maxStreak = currentStreak
+			}
+		} else {
+			currentStreak = 1
+		}
+	}
+	return maxStreak
 }

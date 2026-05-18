@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .stats-grid { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+        .stat-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: center;
+        }
+        .stat-title { font-weight: 600; font-size: 1.1rem; }
+        .stat-values { display: flex; gap: 16px; font-size: 0.9rem; color: var(--text-muted); }
+        .stat-value { text-align: center; }
+        .stat-value strong { display: block; font-size: 1.3rem; color: var(--primary); }
+        .best-streak {
+            background: linear-gradient(135deg, var(--primary), #2e7d32);
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .best-streak strong { font-size: 1.5rem; display: block; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: var(--text-color); text-decoration: none; }
+        .back-link:hover { color: var(--primary); }
+        .placeholder { text-align: center; color: var(--text-muted); padding: 40px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>📊 Статистика</h1>
+        <a href="index.html" class="btn-outline" style="width:auto;text-decoration:none">← Назад</a>
+    </header>
+    <main class="app-card">
+        <div id="bestStreak" class="best-streak hidden">
+            🔥 Лучший стрик: <strong id="bestStreakValue">0</strong> дней
+            <span id="bestStreakHabit" style="font-size:0.9rem;opacity:0.9"></span>
+        </div>
+        <div id="statsList" class="stats-grid">
+            <p class="placeholder">Загрузка статистики...</p>
+        </div>
+    </main>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const token = localStorage.getItem('token');
+        if (!token) { window.location.href = 'index.html'; return; }
+
+        try {
+            const res = await fetch('/api/habits/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const stats = await res.json();
+            renderStats(stats);
+        } catch (e) {
+            document.getElementById('statsList').innerHTML = '<p class="placeholder">Ошибка загрузки</p>';
+        }
+    });
+
+    function renderStats(stats) {
+        const list = document.getElementById('statsList');
+        const bestStreakEl = document.getElementById('bestStreak');
+        const bestStreakValue = document.getElementById('bestStreakValue');
+        const bestStreakHabit = document.getElementById('bestStreakHabit');
+
+        if (!stats || stats.length === 0) {
+            list.innerHTML = '<p class="placeholder">Нет данных. Добавь привычки и начни тренировать!</p>';
+            bestStreakEl.classList.add('hidden');
+            return;
+        }
+
+        // Находим лучший стрик
+        let best = stats.reduce((max, s) => s.longest_streak > max.longest_streak ? s : max, stats[0]);
+        if (best.longest_streak > 0) {
+            bestStreakValue.textContent = best.longest_streak;
+            bestStreakHabit.textContent = best.title;
+            bestStreakEl.classList.remove('hidden');
+        } else {
+            bestStreakEl.classList.add('hidden');
+        }
+
+        // Отрисовываем карточки
+        list.innerHTML = stats.map(s => `
+                <div class="stat-card">
+                    <div class="stat-title">${escapeHtml(s.title)}</div>
+                    <div class="stat-values">
+                        <div class="stat-value">
+                            <strong>${s.total_days}</strong>
+                            <span>всего дней</span>
+                        </div>
+                        <div class="stat-value">
+                            <strong>${s.current_streak}</strong>
+                            <span>сейчас</span>
+                        </div>
+                        <div class="stat-value">
+                            <strong>${s.longest_streak}</strong>
+                            <span>рекорд</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+</script>
+</body>
+</html>

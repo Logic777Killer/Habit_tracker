@@ -38,4 +38,6 @@ func setupRoutes() {
 
 	http.HandleFunc("/api/habits/logs", middleware.AuthMiddleware(handlers.GetHabitLogsHandler))
 
+	http.HandleFunc("/api/habits/stats", middleware.AuthMiddleware(handlers.GetHabitStatsHandler))
+
 }

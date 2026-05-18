@@ -307,3 +307,40 @@ func calculateLongestStreak(dates []time.Time) int {
 	}
 	return maxStreak
 }
+
+func DeleteHabitHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		HabitID int `json:"habit_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.HabitID == 0 {
+		http.Error(w, "Invalid habit_id", http.StatusBadRequest)
+		return
+	}
+
+	var ownerID int
+	err := database.DB.QueryRow("SELECT user_id FROM habits WHERE id = $1", req.HabitID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Forbidden or not found", http.StatusForbidden)
+		return
+	}
+
+	_, err = database.DB.Exec("DELETE FROM habits WHERE id = $1", req.HabitID)
+	if err != nil {
+		http.Error(w, "Failed to delete", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Habit deleted"})
+}

@@ -93,5 +93,34 @@
     </div>
 </div>
 
+<!-- Модальное окно добавления привычки -->
+<div id="addHabitModal" class="modal hidden">
+    <div class="modal-content" style="max-width:400px">
+        <div class="modal-header">
+            <h3>✨ Новая привычка</h3>
+            <button class="modal-close" id="closeAddHabit">&times;</button>
+        </div>
+        <form id="addHabitForm">
+            <div class="form-group">
+                <label for="habitTitle">Название *</label>
+                <input type="text" id="habitTitle" placeholder="Например: Пить воду" required>
+            </div>
+            <div class="form-group">
+                <label for="habitDesc">Описание</label>
+                <input type="text" id="habitDesc" placeholder="Детали (необязательно)">
+            </div>
+            <div class="form-group">
+                <label for="habitColor">Цвет</label>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <input type="color" id="habitColor" value="#4caf50" style="width:50px;height:36px;border:none;border-radius:6px;cursor:pointer">
+                    <span id="colorPreview" style="font-family:monospace;color:var(--text-muted)">#4caf50</span>
+                </div>
+            </div>
+            <p class="error-msg" id="addHabitError"></p>
+            <button type="submit" class="btn-primary">Создать</button>
+        </form>
+    </div>
+</div>
+
 </body>
 </html>

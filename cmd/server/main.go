@@ -40,4 +40,6 @@ func setupRoutes() {
 
 	http.HandleFunc("/api/habits/stats", middleware.AuthMiddleware(handlers.GetHabitStatsHandler))
 
+	http.HandleFunc("/api/habits/delete", middleware.AuthMiddleware(handlers.DeleteHabitHandler))
+
 }

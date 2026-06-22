@@ -3,11 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"habit-tracker/internal/auth"
 	"habit-tracker/internal/database"
 	"habit-tracker/internal/models"
 	"log"
 	"net/http"
+	"net/mail"
 	"strings"
 )
 
@@ -34,6 +36,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	req.Email = strings.TrimSpace(req.Email)
+	if err := validateRegisterRequest(req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -76,6 +84,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
+	req.Email = strings.TrimSpace(req.Email)
+	if err := validateLoginRequest(req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Ищем пользователя по email
 	var user models.User
@@ -110,4 +123,32 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		"role":     user.Role,
 		"username": user.Username,
 	})
+}
+
+func validateRegisterRequest(req RegisterRequest) error {
+	if req.Username == "" {
+		return errors.New("username is required")
+	}
+	if len(req.Username) > 50 {
+		return errors.New("username is too long")
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return errors.New("invalid email")
+	}
+	if len(req.Password) < 6 {
+		return errors.New("password must contain at least 6 characters")
+	}
+
+	return nil
+}
+
+func validateLoginRequest(req LoginRequest) error {
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return errors.New("invalid email")
+	}
+	if req.Password == "" {
+		return errors.New("password is required")
+	}
+
+	return nil
 }

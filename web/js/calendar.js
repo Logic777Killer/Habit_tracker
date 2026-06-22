@@ -103,7 +103,7 @@ async function toggleDay(div, dateStr) {
 
     try {
         const res = await fetch('/api/habits/toggle', {
-            method: 'POST',
+            method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -112,8 +112,10 @@ async function toggleDay(div, dateStr) {
         });
 
         if (!res.ok) {
+            const errorText = await res.text();
+            console.error('Failed to toggle calendar day:', res.status, errorText);
             div.classList.toggle('completed');
-            alert('Ошибка при сохранении');
+            alert(errorText || 'Ошибка при сохранении');
         } else {
             if (window.refreshHabitsList) {
                 window.refreshHabitsList();

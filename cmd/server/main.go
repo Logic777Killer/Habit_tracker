@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"habit-tracker/internal/auth"
 	"habit-tracker/internal/config"
 	"habit-tracker/internal/database"
 	"habit-tracker/internal/handlers"
@@ -12,6 +13,10 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
+
+	if err := auth.SetJWTSecret(cfg.JWTSecret); err != nil {
+		log.Fatalf("JWT configuration error: %v", err)
+	}
 
 	if err := database.InitDB(cfg); err != nil {
 		log.Fatalf("Could not connect to database: %v", err)
@@ -31,15 +36,19 @@ func setupRoutes() {
 	http.HandleFunc("/api/register", handlers.RegisterHandler)
 	http.HandleFunc("/api/login", handlers.LoginHandler)
 
-	http.HandleFunc("/api/habits", middleware.AuthMiddleware(handlers.GetHabitsHandler))
-	http.HandleFunc("/api/habits/create", middleware.AuthMiddleware(handlers.CreateHabitHandler))
+	userRoute := func(handler http.HandlerFunc) http.HandlerFunc {
+		return middleware.AuthMiddleware(middleware.RequireRole("user", "admin")(handler))
+	}
 
-	http.HandleFunc("/api/habits/toggle", middleware.AuthMiddleware(handlers.ToggleHabitHandler))
+	http.HandleFunc("/api/habits", userRoute(handlers.GetHabitsHandler))
+	http.HandleFunc("/api/habits/create", userRoute(handlers.CreateHabitHandler))
 
-	http.HandleFunc("/api/habits/logs", middleware.AuthMiddleware(handlers.GetHabitLogsHandler))
+	http.HandleFunc("/api/habits/toggle", userRoute(handlers.ToggleHabitHandler))
 
-	http.HandleFunc("/api/habits/stats", middleware.AuthMiddleware(handlers.GetHabitStatsHandler))
+	http.HandleFunc("/api/habits/logs", userRoute(handlers.GetHabitLogsHandler))
 
-	http.HandleFunc("/api/habits/delete", middleware.AuthMiddleware(handlers.DeleteHabitHandler))
+	http.HandleFunc("/api/habits/stats", userRoute(handlers.GetHabitStatsHandler))
+
+	http.HandleFunc("/api/habits/delete", userRoute(handlers.DeleteHabitHandler))
 
 }

@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,16 @@ func CreateHabitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&habit); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+	habit.Title = strings.TrimSpace(habit.Title)
+	habit.Description = strings.TrimSpace(habit.Description)
+	habit.Color = strings.TrimSpace(habit.Color)
+	if habit.Color == "" {
+		habit.Color = "#4caf50"
+	}
+	if habit.Title == "" || len(habit.Title) > 100 || !isValidHexColor(habit.Color) {
+		http.Error(w, "Invalid habit data", http.StatusBadRequest)
 		return
 	}
 
@@ -94,7 +105,7 @@ func GetHabitsHandler(w http.ResponseWriter, r *http.Request) {
 
 // ToggleHabitHandler переключает статус выполнения привычки на сегодня
 func ToggleHabitHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -109,24 +120,20 @@ func ToggleHabitHandler(w http.ResponseWriter, r *http.Request) {
 		HabitID int    `json:"habit_id"`
 		Date    string `json:"date"` // Опционально: YYYY-MM-DD
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.HabitID <= 0 {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	// Определяем целевую дату
-	targetDate := time.Now().Format("2006-01-02")
-	if req.Date != "" {
-		if _, err := time.Parse("2006-01-02", req.Date); err != nil {
-			http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
-			return
-		}
-		targetDate = req.Date
+	targetDate, err := parseHabitLogDate(req.Date)
+	if err != nil {
+		http.Error(w, "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
 	}
 
 	// Проверка принадлежности привычки
 	var ownerID int
-	err := database.DB.QueryRow("SELECT user_id FROM habits WHERE id = $1", req.HabitID).Scan(&ownerID)
+	err = database.DB.QueryRow("SELECT user_id FROM habits WHERE id = $1", req.HabitID).Scan(&ownerID)
 	if err != nil || ownerID != userID {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -170,12 +177,32 @@ func GetHabitLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	habitID, _ := strconv.Atoi(r.URL.Query().Get("habit_id"))
-	month, _ := strconv.Atoi(r.URL.Query().Get("month"))
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
+	userID, ok := middleware.GetUserIDFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	if habitID == 0 || month == 0 || year == 0 {
+	habitID, habitErr := strconv.Atoi(r.URL.Query().Get("habit_id"))
+	month, monthErr := strconv.Atoi(r.URL.Query().Get("month"))
+	year, yearErr := strconv.Atoi(r.URL.Query().Get("year"))
+
+	if !isValidHabitLogsQuery(habitID, month, year, habitErr, monthErr, yearErr) {
 		http.Error(w, "Missing habit_id, month or year", http.StatusBadRequest)
+		return
+	}
+
+	var hasAccess bool
+	err := database.DB.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM habits WHERE id = $1 AND user_id = $2)",
+		habitID, userID,
+	).Scan(&hasAccess)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if !hasAccess {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -308,8 +335,43 @@ func calculateLongestStreak(dates []time.Time) int {
 	return maxStreak
 }
 
+func parseHabitLogDate(date string) (string, error) {
+	if date == "" {
+		return time.Now().Format("2006-01-02"), nil
+	}
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return "", err
+	}
+
+	return date, nil
+}
+
+func isValidHabitLogsQuery(habitID, month, year int, errs ...error) bool {
+	for _, err := range errs {
+		if err != nil {
+			return false
+		}
+	}
+
+	return habitID > 0 && month >= 1 && month <= 12 && year > 0
+}
+
+func isValidHexColor(color string) bool {
+	if len(color) != 7 || color[0] != '#' {
+		return false
+	}
+
+	for _, ch := range color[1:] {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') && (ch < 'A' || ch > 'F') {
+			return false
+		}
+	}
+
+	return true
+}
+
 func DeleteHabitHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -323,7 +385,7 @@ func DeleteHabitHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		HabitID int `json:"habit_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.HabitID == 0 {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.HabitID <= 0 {
 		http.Error(w, "Invalid habit_id", http.StatusBadRequest)
 		return
 	}

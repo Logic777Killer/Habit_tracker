@@ -2,13 +2,43 @@ package auth
 
 import (
 	"errors"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var JWTSecret = []byte("super_secret_key")
+var (
+	jwtSecretMu sync.RWMutex
+	jwtSecret   []byte
+)
+
+// SetJWTSecret настраивает секрет подписи JWT из конфигурации приложения.
+func SetJWTSecret(secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return errors.New("JWT secret is required")
+	}
+
+	jwtSecretMu.Lock()
+	defer jwtSecretMu.Unlock()
+	jwtSecret = []byte(secret)
+	return nil
+}
+
+func getJWTSecret() ([]byte, error) {
+	jwtSecretMu.RLock()
+	defer jwtSecretMu.RUnlock()
+	if len(jwtSecret) == 0 {
+		return nil, errors.New("JWT secret is not configured")
+	}
+
+	secret := make([]byte, len(jwtSecret))
+	copy(secret, jwtSecret)
+	return secret, nil
+}
 
 // HashPassword хэширует пароль
 func HashPassword(password string) (string, error) {
@@ -31,6 +61,11 @@ type Claims struct {
 
 // GenerateToken создает JWT токен
 func GenerateToken(userID int, role string) (string, error) {
+	secret, err := getJWTSecret()
+	if err != nil {
+		return "", err
+	}
+
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
 		UserID: userID,
@@ -41,14 +76,17 @@ func GenerateToken(userID int, role string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(JWTSecret)
+	return token.SignedString(secret)
 }
 
 // ValidateToken проверяет токен и возвращает UserID
 func ValidateToken(tokenString string) (int, string, error) {
 	claims := &Claims{}
 	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return JWTSecret, nil
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return getJWTSecret()
 	})
 
 	if err != nil {

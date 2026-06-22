@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = newDone ? '✓' : '○';
         try {
             const res = await fetch('/api/habits/toggle', {
-                method: 'POST',
+                method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -191,6 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ habit_id: parseInt(habitId) })
             });
             if (!res.ok) {
+                const errorText = await res.text();
+                console.error('Failed to toggle habit:', res.status, errorText);
                 btn.dataset.done = isDone.toString();
                 btn.classList.toggle('done');
                 btn.textContent = isDone ? '✓' : '○';
@@ -270,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = localStorage.getItem('token');
         try {
             const res = await fetch('/api/habits/delete', {
-                method: 'POST',
+                method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ habit_id: habitId })
             });
@@ -278,7 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (window.refreshHabitsList) window.refreshHabitsList();
                 else location.reload();
             } else {
-                alert('Ошибка при удалении');
+                const errorText = await res.text();
+                alert(errorText || 'Ошибка при удалении');
             }
         } catch(e) { alert('Ошибка сети'); }
     }
